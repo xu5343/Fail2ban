@@ -1,12 +1,11 @@
 clear
-#CheckIfRoot
-[ $(id -u) != "0" ] && { echo "${CFAILURE}Error: You must be root to run this script${CEND}"; exit 1; }
+# 检查是否为Root用户
+[ $(id -u) != "0" ] && { echo "错误: 您必须以root身份运行此脚本"; exit 1; }
 
-
-#ReadSSHPort
+# 读取SSH端口
 [ -z "`grep ^Port /etc/ssh/sshd_config`" ] && ssh_port=22 || ssh_port=`grep ^Port /etc/ssh/sshd_config | awk '{print $2}'`
 
-#CheckOS
+# 检查操作系统
 if [ -n "$(grep 'Aliyun Linux release' /etc/issue)" -o -e /etc/redhat-release ]; then
   OS=CentOS
   [ -n "$(grep ' 7\.' /etc/redhat-release)" ] && CentOS_RHEL_version=7
@@ -23,14 +22,14 @@ elif [ -n "$(grep 'Deepin' /etc/issue)" -o "$(lsb_release -is 2>/dev/null)" == "
   OS=Debian
   [ ! -e "$(which lsb_release)" ] && { apt-get -y update; apt-get -y install lsb-release; clear; }
   Debian_version=$(lsb_release -sr | awk -F. '{print $1}')
-# kali rolling
+# Kali rolling
 elif [ -n "$(grep 'Kali GNU/Linux Rolling' /etc/issue)" -o "$(lsb_release -is 2>/dev/null)" == "Kali" ]; then
   OS=Debian
   [ ! -e "$(which lsb_release)" ] && { apt-get -y update; apt-get -y install lsb-release; clear; }
   if [ -n "$(grep 'VERSION="2016.*"' /etc/os-release)" ]; then
     Debian_version=8
   else
-    echo "${CFAILURE}Does not support this OS, Please contact the author! ${CEND}"
+    echo "不支持此操作系统，请联系作者！"
     kill -9 $$
   fi
 elif [ -n "$(grep 'Ubuntu' /etc/issue)" -o "$(lsb_release -is 2>/dev/null)" == "Ubuntu" -o -n "$(grep 'Linux Mint' /etc/issue)" ]; then
@@ -43,27 +42,28 @@ elif [ -n "$(grep 'elementary' /etc/issue)" -o "$(lsb_release -is 2>/dev/null)" 
   [ ! -e "$(which lsb_release)" ] && { apt-get -y update; apt-get -y install lsb-release; clear; }
   Ubuntu_version=16
 else
-  echo "${CFAILURE}Does not support this OS, Please contact the author! ${CEND}"
+  echo "不支持此操作系统，请联系作者！"
   kill -9 $$
 fi
-#Read Imformation From The User
-echo "Welcome to Fail2ban!"
+
+# 从用户读取信息
+echo "欢迎使用 Fail2ban！"
 echo "--------------------"
-echo "This Shell Script can protect your server from SSH attacks with the help of Fail2ban and iptables"
+echo "这个Shell脚本可以通过 Fail2ban 和 iptables 保护您的服务器免受SSH攻击"
 echo ""
 
 while :; do echo
-  read -p "Do you want to change your SSH Port? [y/n]: " IfChangeSSHPort
+  read -p "是否要更改SSH端口？ [y/n]: " IfChangeSSHPort
   if [ ${IfChangeSSHPort} == 'y' ]; then
     if [ -e "/etc/ssh/sshd_config" ];then
     [ -z "`grep ^Port /etc/ssh/sshd_config`" ] && ssh_port=22 || ssh_port=`grep ^Port /etc/ssh/sshd_config | awk '{print $2}'`
     while :; do echo
-        read -p "Please input SSH port(Default: $ssh_port): " SSH_PORT
+        read -p "请输入SSH端口(默认: $ssh_port): " SSH_PORT
         [ -z "$SSH_PORT" ] && SSH_PORT=$ssh_port
         if [ $SSH_PORT -eq 22 >/dev/null 2>&1 -o $SSH_PORT -gt 1024 >/dev/null 2>&1 -a $SSH_PORT -lt 65535 >/dev/null 2>&1 ];then
             break
         else
-            echo "${CWARNING}input error! Input range: 22,1025~65534${CEND}"
+            echo "输入错误！输入范围: 22, 1025~65534"
         fi
     done
     if [ -z "`grep ^Port /etc/ssh/sshd_config`" -a "$SSH_PORT" != '22' ];then
@@ -76,22 +76,23 @@ while :; do echo
   elif [ ${IfChangeSSHPort} == 'n' ]; then
     break
   else
-    echo "${CWARNING}Input error! Please only input y or n!${CEND}"
+    echo "输入错误！请仅输入 y 或 n！"
   fi
 done
 ssh_port=$SSH_PORT
 echo ""
-	read -p "Input the maximun times for trying [2-10]:  " maxretry
+read -p "输入最大尝试次数 [2-10]: " maxretry
 echo ""
-read -p "Input the lasting time for blocking a IP [hours]:  " bantime
-if [ ${maxretry} == '' ]; then
+read -p "输入封锁IP的持续时间 [小时]: " bantime
+if [ -z ${maxretry} ]; then
 	maxretry=3
 fi
-if [ ${bantime} == '' ];then
+if [ -z ${bantime} ];then
 	bantime=24
 fi
 ((bantime=$bantime*60*60))
-#Install
+
+# 安装Fail2ban
 if [ ${OS} == CentOS ]; then
   yum -y install epel-release
   yum -y install fail2ban
@@ -102,7 +103,11 @@ if [ ${OS} == Ubuntu ] || [ ${OS} == Debian ];then
   apt-get -y install fail2ban
 fi
 
-#Configure
+# 检查安装的 Fail2ban 版本
+fail2ban_version=$(fail2ban-server --version | grep -oP '\d+\.\d+\.\d+')
+echo "安装的 Fail2ban 版本为: $fail2ban_version"
+
+# 配置Fail2ban
 rm -rf /etc/fail2ban/jail.local
 touch /etc/fail2ban/jail.local
 if [ ${OS} == CentOS ]; then
@@ -141,7 +146,7 @@ bantime = $bantime
 EOF
 fi
 
-#Start
+# 启动并设置Fail2ban为开机自启动
 if [ ${OS} == CentOS ]; then
   if [ ${CentOS_RHEL_version} == 7 ]; then
     systemctl restart fail2ban
@@ -153,11 +158,12 @@ if [ ${OS} == CentOS ]; then
 fi
 
 if [[ ${OS} =~ ^Ubuntu$|^Debian$ ]]; then
-  service fail2ban restart
+  systemctl restart fail2ban
+  systemctl enable fail2ban
 fi
 
-#Finish
-echo "Finish Installing ! Reboot the sshd now !"
+# 完成
+echo "安装完成！现在重启sshd！"
 
 if [ ${OS} == CentOS ]; then
   if [ ${CentOS_RHEL_version} == 7 ]; then
@@ -171,9 +177,6 @@ if [[ ${OS} =~ ^Ubuntu$|^Debian$ ]]; then
   service ssh restart
 fi
 echo ""
-echo 'Telegram Group: https://t.me/functionclub'
-echo 'Google Puls: https://plus.google.com/communities/113154644036958487268'
-echo 'Github: https://github.com/FunctionClub'
-echo 'QQ Group:277717865'
+echo 'Github: https://github.com/xu5343'
 
-echo "Fail2ban is now runing on this server now!"
+echo "Fail2ban 现在正在您的服务器上运行！"
