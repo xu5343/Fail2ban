@@ -28,10 +28,8 @@
 2. 若出现SSH无法连接的情况，请检查是否修改过SSH端口，请填写写改后的正确端口进行连接
 
 # 更新日志 #
+2024.05.27 优化逻辑，增加工作状态检测，语言改为中文。
 2016.11.15 第一次提交，初步完成。
-
-# 关于 #
-Made by [FunctionClub](http://function.club "FunctionClub")
 
 # 鸣谢 #
 - [Fail2ban](http://www.fail2ban.org "Fail2ban")
