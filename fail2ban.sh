@@ -68,13 +68,14 @@ while :; do echo
         fi
       done
       if [ -z "$(grep ^Port /etc/ssh/sshd_config)" -a "$SSH_PORT" != '22' ]; then
-        sed -i "s@^#Port.*@&\nPort $SSH_PORT@" /etc/ssh/sshd_config
+        echo "Port $SSH_PORT" >> /etc/ssh/sshd_config
       elif [ -n "$(grep ^Port /etc/ssh/sshd_config)" ]; then
         sed -i "s@^Port.*@Port $SSH_PORT@" /etc/ssh/sshd_config
       fi
     fi
     break
   elif [ ${IfChangeSSHPort} == 'n' ]; then
+    SSH_PORT=$ssh_port
     break
   else
     echo "输入错误！请仅输入 y 或 n！"
@@ -110,7 +111,7 @@ if [ ${OS} == CentOS ]; then
 [DEFAULT]
 ignoreip = 127.0.0.1
 bantime = 86400
-maxretry = 3
+maxretry = $maxretry
 findtime = 1800
 
 [ssh-iptables]
@@ -121,6 +122,16 @@ logpath = /var/log/secure
 maxretry = $maxretry
 findtime = 3600
 bantime = $bantime
+
+[custom-sshd]
+enabled = true
+filter = custom-sshd
+port = $ssh_port
+logpath = /var/log/secure
+maxretry = $maxretry
+findtime = 600
+bantime = $bantime
+action = %(action_mwl)s
 EOF
 else
   cat <<EOF >> /etc/fail2ban/jail.local
@@ -138,8 +149,28 @@ logpath = /var/log/auth.log
 maxretry = $maxretry
 findtime = 3600
 bantime = $bantime
+
+[custom-sshd]
+enabled = true
+filter = custom-sshd
+port = $ssh_port
+logpath = /var/log/auth.log
+maxretry = $maxretry
+findtime = 3600
+bantime = $bantime
+action = %(action_mwl)s
 EOF
 fi
+
+# 创建自定义过滤规则文件
+cat <<EOF > /etc/fail2ban/filter.d/custom-sshd.conf
+[Definition]
+failregex = ^.*sshd\[.*\]: Bad protocol version identification.*from <HOST> port.*
+            ^.*sshd\[.*\]: Connection closed by <HOST> port.*\[preauth\]
+            ^.*sshd\[.*\]: Accepted password for root from <HOST> port.*
+            ^.*sshd\[.*\]: Failed password for .* from <HOST> port.*
+            ^.*sshd\[.*\]: Invalid user .* from <HOST> port.*
+EOF
 
 # 启动并设置Fail2ban为开机自启动
 if [ ${OS} == CentOS ]; then
@@ -178,6 +209,12 @@ fi
 # 检查 Fail2ban状态 是否正常
 echo "Fail2ban状态"
 fail2ban-client status
+
+echo "Fail2ban ssh-iptables状态"
+fail2ban-client status ssh-iptables
+
+echo "Fail2ban custom-sshd状态"
+fail2ban-client status custom-sshd
 
 echo ""
 echo 'Github: https://github.com/xu5343'
