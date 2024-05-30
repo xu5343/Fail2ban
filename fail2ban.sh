@@ -170,6 +170,10 @@ failregex = ^.*sshd\[.*\]: Bad protocol version identification.*from <HOST> port
             ^.*sshd\[.*\]: Accepted password for root from <HOST> port.*
             ^.*sshd\[.*\]: Failed password for .* from <HOST> port.*
             ^.*sshd\[.*\]: Invalid user .* from <HOST> port.*
+            ^.*sshd\[.*\]: Failed \S+ for invalid user .* from <HOST> port.*
+            ^.*sshd\[.*\]: User .* from <HOST> not allowed because not listed in AllowUsers$
+            ^.*sshd\[.*\]: Received disconnect from <HOST>: 11: \[preauth\]$
+            ^.*sshd\[.*\]: reverse mapping checking getaddrinfo for .* \[<HOST>\] failed - POSSIBLE BREAK-IN ATTEMPT!$
 EOF
 
 # 启动并设置Fail2ban为开机自启动
