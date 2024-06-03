@@ -123,6 +123,17 @@ maxretry = $maxretry
 findtime = 3600
 bantime = $bantime
 
+[cc-attack]
+enabled = true
+filter = cc-attack
+action = iptables[name=CC-ATTACK-HTTP, port=http, protocol=tcp]
+         iptables[name=CC-ATTACK-HTTPS, port=https, protocol=tcp]
+logpath = /var/log/apache2/access.log
+          /var/log/nginx/access.log
+maxretry = 200
+findtime = 600
+bantime = 3600
+
 [custom-sshd]
 enabled = true
 filter = custom-sshd
@@ -150,6 +161,17 @@ maxretry = $maxretry
 findtime = 3600
 bantime = $bantime
 
+[cc-attack]
+enabled = true
+filter = cc-attack
+action = iptables[name=CC-ATTACK-HTTP, port=http, protocol=tcp]
+         iptables[name=CC-ATTACK-HTTPS, port=https, protocol=tcp]
+logpath = /var/log/apache2/access.log
+          /var/log/nginx/access.log
+maxretry = 200
+findtime = 600
+bantime = 3600
+
 [custom-sshd]
 enabled = true
 filter = custom-sshd
@@ -174,6 +196,13 @@ failregex = ^.*sshd\[.*\]: Bad protocol version identification.*from <HOST> port
             ^.*sshd\[.*\]: User .* from <HOST> not allowed because not listed in AllowUsers$
             ^.*sshd\[.*\]: Received disconnect from <HOST>: 11: \[preauth\]$
             ^.*sshd\[.*\]: reverse mapping checking getaddrinfo for .* \[<HOST>\] failed - POSSIBLE BREAK-IN ATTEMPT!$
+EOF
+
+# 创建自定义过滤规则文件
+cat <<EOF > /etc/fail2ban/filter.d/cc-attack.conf
+[Definition]
+failregex = ^<HOST> -.*"(GET|POST).*
+ignoreregex =
 EOF
 
 # 启动并设置Fail2ban为开机自启动
