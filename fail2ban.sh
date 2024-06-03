@@ -249,6 +249,9 @@ fail2ban-client status ssh-iptables
 echo "Fail2ban custom-sshd状态"
 fail2ban-client status custom-sshd
 
+echo "Fail2ban cc-attack状态"
+fail2ban-client status cc-attack
+
 echo ""
 echo 'Github: https://github.com/xu5343'
 echo "Fail2ban 现在正在您的服务器上运行！"
