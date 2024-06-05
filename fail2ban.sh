@@ -150,17 +150,6 @@ maxretry = $maxretry
 findtime = 3600
 bantime = $bantime
 
-[cc-attack]
-enabled = true
-filter = cc-attack
-action = iptables[name=CC-ATTACK-HTTP, port=http, protocol=tcp]
-         iptables[name=CC-ATTACK-HTTPS, port=https, protocol=tcp]
-logpath = /var/log/apache2/access.log
-          /var/log/nginx/access.log
-maxretry = 200
-findtime = 600
-bantime = 3600
-
 [custom-sshd]
 enabled = true
 filter = custom-sshd
@@ -230,9 +219,6 @@ fail2ban-client status ssh-iptables
 
 echo "Fail2ban custom-sshd状态"
 fail2ban-client status custom-sshd
-
-echo "Fail2ban cc-attack状态"
-fail2ban-client status cc-attack
 
 echo ""
 echo 'Github: https://github.com/xu5343'
