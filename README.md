@@ -25,6 +25,7 @@
 
 # 自定义自动检测日志 #  
 ~~~
+yum install parallel
 crontab -e
 0 * * * * /root/jc3.sh >> /root/jc3.log 2>&1
 chmod +x jc3.sh
