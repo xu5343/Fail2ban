@@ -123,7 +123,8 @@ for LOG_FILE in "${LOG_FILES_TO_PROCESS[@]}"; do
         COUNT=$(echo $line | awk '{print $2}')
         echo "$IP $COUNT"
         if (( COUNT > BAN_THRESHOLD )); then
-            fail2ban-client set custom-log banip ${IP}
+            fail2ban-client set http-get-dos banip ${IP}
+            firewall-cmd --zone=public --list-rich-rules | grep ${IP}        
             if [[ $? -eq 0 ]]; then
                 echo "IP $IP has been banned"
             else
@@ -132,12 +133,8 @@ for LOG_FILE in "${LOG_FILES_TO_PROCESS[@]}"; do
         fi
     done
 
-    # 重新加载Fail2ban来处理新的日志条目
-    fail2ban-client reload custom-log
-    sleep 2
-
     # 检查Fail2ban状态以确认IP是否被封禁
-    fail2ban-client status custom-log
+    fail2ban-client status http-get-dos
 
     # 清理临时文件
     rm -r "$LOG_PART_DIR"
