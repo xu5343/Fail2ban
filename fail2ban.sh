@@ -5,98 +5,76 @@ clear
 [ $(id -u) != "0" ] && { echo "错误: 您必须以root身份运行此脚本"; exit 1; }
 
 # 读取SSH端口
-[ -z "$(grep ^Port /etc/ssh/sshd_config)" ] && ssh_port=22 || ssh_port=$(grep ^Port /etc/ssh/sshd_config | awk '{print $2}')
+[ -z "$(grep ^Port /etc/ssh/sshd_config)" ] && SSH_PORT=22 || SSH_PORT=$(grep ^Port /etc/ssh/sshd_config | awk '{print $2}')
 
 # 检查操作系统
-if [ -n "$(grep 'Aliyun Linux release' /etc/issue)" -o -e /etc/redhat-release ]; then
-  OS=CentOS
-  [ -n "$(grep ' 7\.' /etc/redhat-release)" ] && CentOS_RHEL_version=7
-  [ -n "$(grep ' 6\.' /etc/redhat-release)" -o -n "$(grep 'Aliyun Linux release6 15' /etc/issue)" ] && CentOS_RHEL_version=6
-  [ -n "$(grep ' 5\.' /etc/redhat-release)" -o -n "$(grep 'Aliyun Linux release5' /etc/issue)" ] && CentOS_RHEL_version=5
-elif [ -n "$(grep 'Amazon Linux AMI release' /etc/issue)" -o -e /etc/system-release ]; then
-  OS=CentOS
-  CentOS_RHEL_version=6
-elif [ -n "$(grep 'bian' /etc/issue)" -o "$(lsb_release -is 2>/dev/null)" == "Debian" ]; then
-  OS=Debian
-  [ ! -e "$(which lsb_release)" ] && { apt-get -y update; apt-get -y install lsb-release; clear; }
-  Debian_version=$(lsb_release -sr | awk -F. '{print $1}')
-elif [ -n "$(grep 'Deepin' /etc/issue)" -o "$(lsb_release -is 2>/dev/null)" == "Deepin" ]; then
-  OS=Debian
-  [ ! -e "$(which lsb_release)" ] && { apt-get -y update; apt-get -y install lsb-release; clear; }
-  Debian_version=$(lsb_release -sr | awk -F. '{print $1}')
-elif [ -n "$(grep 'Kali GNU/Linux Rolling' /etc/issue)" -o "$(lsb_release -is 2>/dev/null)" == "Kali" ]; then
-  OS=Debian
-  [ ! -e "$(which lsb_release)" ] && { apt-get -y update; apt-get -y install lsb-release; clear; }
-  if [ -n "$(grep 'VERSION=\"2016.*\"' /etc/os-release)" ]; then
-    Debian_version=8
-  else
-    echo "不支持此操作系统，请联系作者！"
-    kill -9 $$
-  fi
-elif [ -n "$(grep 'Ubuntu' /etc/issue)" -o "$(lsb_release -is 2>/dev/null)" == "Ubuntu" -o -n "$(grep 'Linux Mint' /etc/issue)" ]; then
-  OS=Ubuntu
-  [ ! -e "$(which lsb_release)" ] && { apt-get -y update; apt-get -y install lsb-release; clear; }
-  Ubuntu_version=$(lsb_release -sr | awk -F. '{print $1}')
-  [ -n "$(grep 'Linux Mint 18' /etc/issue)" ] && Ubuntu_version=16
-elif [ -n "$(grep 'elementary' /etc/issue)" -o "$(lsb_release -is 2>/dev/null)" == 'elementary' ]; then
-  OS=Ubuntu
-  [ ! -e "$(which lsb_release)" ] && { apt-get -y update; apt-get -y install lsb-release; clear; }
-  Ubuntu_version=16
+if [ -f /etc/os-release ]; then
+  . /etc/os-release
+  OS=$ID
+  VER=$VERSION_ID
 else
-  echo "不支持此操作系统，请联系作者！"
-  kill -9 $$
+  echo "无法检测操作系统，请联系作者！"
+  exit 1
 fi
 
 # 从用户读取信息
 echo "欢迎使用 Fail2ban！"
 echo "--------------------"
-echo "这个Shell脚本可以通过 Fail2ban 和 iptables 保护您的服务器免受SSH攻击"
+echo "这个Shell脚本可以通过 Fail2ban 和 firewalld 保护您的服务器免受SSH攻击"
 echo ""
 
-while :; do echo
-  read -p "是否要更改SSH端口？ [y/n]: " IfChangeSSHPort
-  if [ ${IfChangeSSHPort} == 'y' ]; then
-    if [ -e "/etc/ssh/sshd_config" ];then
-      [ -z "$(grep ^Port /etc/ssh/sshd_config)" ] && ssh_port=22 || ssh_port=$(grep ^Port /etc/ssh/sshd_config | awk '{print $2}')
-      while :; do echo
-        read -p "请输入SSH端口(默认: $ssh_port): " SSH_PORT
-        [ -z "$SSH_PORT" ] && SSH_PORT=$ssh_port
-        if [[ $SSH_PORT -eq 22 ]] || [[ $SSH_PORT -gt 1024 && $SSH_PORT -lt 65535 ]]; then
-          break
-        else
-          echo "输入错误！输入范围: 22, 1025~65534"
-        fi
-      done
-      if [ -z "$(grep ^Port /etc/ssh/sshd_config)" -a "$SSH_PORT" != '22' ]; then
-        echo "Port $SSH_PORT" >> /etc/ssh/sshd_config
-      elif [ -n "$(grep ^Port /etc/ssh/sshd_config)" ]; then
-        sed -i "s@^Port.*@Port $SSH_PORT@" /etc/ssh/sshd_config
+while :; do
+  read -p "是否要更改SSH端口？ [y/n]: " ChangeSSHPort
+  if [[ $ChangeSSHPort == 'y' || $ChangeSSHPort == 'Y' ]]; then
+    while :; do
+      read -p "请输入SSH端口(默认: $SSH_PORT): " InputSSHPort
+      [ -z "$InputSSHPort" ] && InputSSHPort=$SSH_PORT
+      if [[ $InputSSHPort -eq 22 || ($InputSSHPort -gt 1024 && $InputSSHPort -lt 65535) ]]; then
+        SSH_PORT=$InputSSHPort
+        break
+      else
+        echo "输入错误！输入范围: 22, 1025~65534"
       fi
-    fi
+    done
+    sed -i "s/^Port .*/Port $SSH_PORT/" /etc/ssh/sshd_config
     break
-  elif [ ${IfChangeSSHPort} == 'n' ]; then
-    SSH_PORT=$ssh_port
+  elif [[ $ChangeSSHPort == 'n' || $ChangeSSHPort == 'N' ]]; then
     break
   else
     echo "输入错误！请仅输入 y 或 n！"
   fi
 done
-ssh_port=$SSH_PORT
-echo ""
-read -p "输入最大尝试次数 [2-10]: " maxretry
-echo ""
-read -p "输入封锁IP的持续时间 [小时]: " bantime
-[ -z ${maxretry} ] && maxretry=3
-[ -z ${bantime} ] && bantime=24
-((bantime=$bantime*60*60))
 
-# 安装Fail2ban
-if [ ${OS} == CentOS ]; then
+echo ""
+read -p "输入最大尝试次数 [2-10]: " MaxRetry
+echo ""
+read -p "输入封锁IP的持续时间 [小时]: " BanTime
+[ -z "$MaxRetry" ] && MaxRetry=3
+[ -z "$BanTime" ] && BanTime=24
+BanTime=$((BanTime * 60 * 60))
+
+# 安装Fail2ban和firewalld
+if [[ $OS == "centos" || $OS == "rhel" ]]; then
   yum -y install epel-release
   yum -y install fail2ban firewalld
-elif [[ ${OS} =~ ^Ubuntu$|^Debian$ ]]; then
+elif [[ $OS == "ubuntu" || $OS == "debian" ]]; then
   apt-get -y update
   apt-get -y install fail2ban firewalld
+else
+  echo "不支持此操作系统，请联系作者！"
+  exit 1
+fi
+
+# 检查并安装firewalld
+if ! command -v firewall-cmd &> /dev/null; then
+  echo "安装 firewalld..."
+  if [[ $OS == "centos" || $OS == "rhel" ]]; then
+    yum -y install firewalld
+  elif [[ $OS == "ubuntu" || $OS == "debian" ]]; then
+    apt-get -y install firewalld
+  fi
+  systemctl start firewalld
+  systemctl enable firewalld
 fi
 
 # 检查安装的 Fail2ban 版本
@@ -104,105 +82,52 @@ fail2ban_version=$(fail2ban-server --version | grep -oP '\d+\.\d+\.\d+')
 echo "安装的 Fail2ban 版本为: $fail2ban_version"
 
 # 加入 firewall 默认端口
-      if [ -z "$(grep ^Port /etc/ssh/sshd_config)" -a "$SSH_PORT" != '22' ]; then
-        firewall-cmd --permanent --add-service=http
-        firewall-cmd --permanent --add-service=https
-        firewall-cmd --permanent --add-service=ssh
-        firewall-cmd --permanent --add-port=80/tcp
-        firewall-cmd --permanent --add-port=443/tcp
-        firewall-cmd --permanent --add-port=22/tcp
-        firewall-cmd --reload
-        firewall-cmd --list-all
-      elif [ -n "$(grep ^Port /etc/ssh/sshd_config)" ]; then
-        firewall-cmd --permanent --add-service=http
-        firewall-cmd --permanent --add-service=https
-        firewall-cmd --permanent --add-service=ssh
-        firewall-cmd --permanent --add-port=80/tcp
-        firewall-cmd --permanent --add-port=443/tcp
-        firewall-cmd --permanent --add-port=$ssh_port/tcp
-        firewall-cmd --reload
-        firewall-cmd --list-all
-      fi
+firewall-cmd --permanent --add-service=http
+firewall-cmd --permanent --add-service=https
+firewall-cmd --permanent --add-service=ssh
+firewall-cmd --permanent --add-port=80/tcp
+firewall-cmd --permanent --add-port=443/tcp
+firewall-cmd --permanent --add-port=$SSH_PORT/tcp
+firewall-cmd --reload
+firewall-cmd --list-all
 
 # 配置Fail2ban
-rm -rf /etc/fail2ban/jail.local
-touch /etc/fail2ban/jail.local
-if [ ${OS} == CentOS ]; then
-  cat <<EOF >> /etc/fail2ban/jail.local
+cat <<EOF > /etc/fail2ban/jail.local
 [DEFAULT]
-#ignoreip = 127.0.0.1/8 ::1
-#bantime = 86400
-#maxretry = $maxretry
-#findtime = 1800
-#banaction = firewallcmd-rich-rules
-#action = firewallcmd-rich-rules
-
-#[sshd]
-#enabled = true
-#filter = sshd
-#port = ssh
-#logpath = /var/log/secure
-#maxretry = $maxretry
-
-#[custom-sshd]
-#enabled = true
-#filter = custom-sshd
-#port = $ssh_port
-#logpath = /var/log/secure
-#maxretry = $maxretry
-#findtime = 600
-#bantime = $bantime
-#action = firewallcmd-rich-rules
-
-[http-get-dos]
-enabled = true
-port    = http,https
-filter  = http-get-dos
-logpath = /opt/ats/var/log/node/cdnnode.log #自己的网站日志
-maxretry = 800
-findtime = 60
-bantime = $bantime
-action = firewallcmd-rich-rules[name=HTTP, port="http,https", protocol=tcp]
-
-EOF
-else
-  cat <<EOF >> /etc/fail2ban/jail.local
-[DEFAULT]
-#ignoreip = 127.0.0.1/8 ::1
-#bantime = 86400
-#maxretry = $maxretry
-#findtime = 1800
-#banaction = firewallcmd-rich-rules
-#action = firewallcmd-rich-rules
+ignoreip = 127.0.0.1/8 ::1
+bantime = $BanTime
+maxretry = $MaxRetry
+findtime = 1800
+banaction = firewallcmd-rich-rules
+action = firewallcmd-rich-rules
 
 [sshd]
-#enabled = true
-#filter = sshd
-#port = ssh
-#logpath = /var/log/secure
-#maxretry = $maxretry
+enabled = true
+filter = sshd
+port = ssh
+logpath = /var/log/secure
+maxretry = $MaxRetry
 
-#[custom-sshd]
-#enabled = true
-#filter = custom-sshd
-#port = $ssh_port
-#logpath = /var/log/secure
-#maxretry = $maxretry
-#findtime = 600
-#bantime = $bantime
-#action = firewallcmd-rich-rules
+[custom-sshd]
+enabled = true
+filter = custom-sshd
+port = $SSH_PORT
+logpath = /var/log/secure
+maxretry = $MaxRetry
+findtime = 600
+bantime = $BanTime
+action = firewallcmd-rich-rules
 
 [http-get-dos]
 enabled = true
-port    = http,https
-filter  = http-get-dos
-logpath = /opt/ats/var/log/node/cdnnode.log #自己的网站日志
+port = http,https
+filter = http-get-dos
+logpath = /opt/ats/var/log/node/cdnnode.log
 maxretry = 800
 findtime = 60
-bantime = $bantime
+bantime = $BanTime
 action = firewallcmd-rich-rules[name=HTTP, port="http,https", protocol=tcp]
 EOF
-fi
 
 # 创建自定义过滤规则文件
 cat <<EOF > /etc/fail2ban/filter.d/custom-sshd.conf
@@ -219,45 +144,30 @@ failregex = ^.*sshd\[.*\]: Bad protocol version identification.*from <HOST> port
 EOF
 
 # 启动并设置Fail2ban为开机自启动
-if [ ${OS} == CentOS ]; then
-  if [ ${CentOS_RHEL_version} == 7 ]; then
-    systemctl restart fail2ban
-    systemctl enable fail2ban
-  else
-    service fail2ban restart
-    chkconfig fail2ban on
-  fi
-elif [[ ${OS} =~ ^Ubuntu$|^Debian$ ]]; then
-  systemctl restart fail2ban
-  systemctl enable fail2ban
-fi
+systemctl restart fail2ban
+systemctl enable fail2ban
 
 # 检查 Fail2ban 是否正常工作
-fail2ban_status=$(systemctl is-active fail2ban)
-if [ $fail2ban_status == "active" ]; then
+if systemctl is-active --quiet fail2ban; then
   echo "Fail2ban 正常运行！"
 else
   echo "Fail2ban 启动失败，请检查配置！"
+  exit 1
 fi
 
 # 重启 SSH 服务
 echo "现在重启sshd！"
-if [ ${OS} == CentOS ]; then
-  if [ ${CentOS_RHEL_version} == 7 ]; then
-    systemctl restart sshd
-  else
-    service ssh restart
-  fi
-elif [[ ${OS} =~ ^Ubuntu$|^Debian$ ]]; then
-  service ssh restart
-fi
+systemctl restart sshd
 
 # 检查 Fail2ban状态 是否正常
 echo "Fail2ban状态"
 fail2ban-client status
 
-echo "Fail2ban ssh-iptables状态"
-fail2ban-client status ssh-iptables
+echo "Fail2ban sshd状态"
+fail2ban-client status sshd
+
+echo "Fail2ban http-get-dos状态"
+fail2ban-client status http-get-dos
 
 echo "Fail2ban custom-sshd状态"
 fail2ban-client status custom-sshd
