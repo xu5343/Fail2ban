@@ -1,5 +1,5 @@
 # Fail2ban #
-这是一个利用iptables和开源程序fail2ban来进行服务器简单防爆破的脚本。默认自带SSH防御规则。
+这是一个利用firewalld和开源程序fail2ban来进行服务器简单防爆破的脚本。默认自带SSH防御规则。
 
 # 功能 #
 - 自助修改SSH端口
