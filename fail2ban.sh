@@ -93,15 +93,36 @@ read -p "输入封锁IP的持续时间 [小时]: " bantime
 # 安装Fail2ban
 if [ ${OS} == CentOS ]; then
   yum -y install epel-release
-  yum -y install fail2ban
+  yum -y install fail2ban firewalld
 elif [[ ${OS} =~ ^Ubuntu$|^Debian$ ]]; then
   apt-get -y update
-  apt-get -y install fail2ban
+  apt-get -y install fail2ban firewalld
 fi
 
 # 检查安装的 Fail2ban 版本
 fail2ban_version=$(fail2ban-server --version | grep -oP '\d+\.\d+\.\d+')
 echo "安装的 Fail2ban 版本为: $fail2ban_version"
+
+# 加入 firewall 默认端口
+      if [ -z "$(grep ^Port /etc/ssh/sshd_config)" -a "$SSH_PORT" != '22' ]; then
+        firewall-cmd --permanent --add-service=http
+        firewall-cmd --permanent --add-service=https
+        firewall-cmd --permanent --add-service=ssh
+        firewall-cmd --permanent --add-port=80/tcp
+        firewall-cmd --permanent --add-port=443/tcp
+        firewall-cmd --permanent --add-port=22/tcp
+        firewall-cmd --reload
+        firewall-cmd --list-all
+      elif [ -n "$(grep ^Port /etc/ssh/sshd_config)" ]; then
+        firewall-cmd --permanent --add-service=http
+        firewall-cmd --permanent --add-service=https
+        firewall-cmd --permanent --add-service=ssh
+        firewall-cmd --permanent --add-port=80/tcp
+        firewall-cmd --permanent --add-port=443/tcp
+        firewall-cmd --permanent --add-port=$ssh_port/tcp
+        firewall-cmd --reload
+        firewall-cmd --list-all
+      fi
 
 # 配置Fail2ban
 rm -rf /etc/fail2ban/jail.local
@@ -109,56 +130,77 @@ touch /etc/fail2ban/jail.local
 if [ ${OS} == CentOS ]; then
   cat <<EOF >> /etc/fail2ban/jail.local
 [DEFAULT]
-ignoreip = 127.0.0.1
-bantime = 86400
-maxretry = $maxretry
-findtime = 1800
+#ignoreip = 127.0.0.1/8 ::1
+#bantime = 86400
+#maxretry = $maxretry
+#findtime = 1800
+#banaction = firewallcmd-rich-rules
+#action = firewallcmd-rich-rules
 
-[ssh-iptables]
-enabled = true
-filter = sshd
-action = iptables[name=SSH, port=ssh, protocol=tcp]
-logpath = /var/log/secure
-maxretry = $maxretry
-findtime = 3600
-bantime = $bantime
+#[sshd]
+#enabled = true
+#filter = sshd
+#port = ssh
+#logpath = /var/log/secure
+#maxretry = $maxretry
 
-[custom-sshd]
+#[custom-sshd]
+#enabled = true
+#filter = custom-sshd
+#port = $ssh_port
+#logpath = /var/log/secure
+#maxretry = $maxretry
+#findtime = 600
+#bantime = $bantime
+#action = firewallcmd-rich-rules
+
+[http-get-dos]
 enabled = true
-filter = custom-sshd
-port = $ssh_port
-logpath = /var/log/secure
-maxretry = $maxretry
-findtime = 600
+port    = http,https
+filter  = http-get-dos
+logpath = /opt/ats/var/log/node/cdnnode.log #自己的网站日志
+maxretry = 800
+findtime = 60
 bantime = $bantime
-action = %(action_mwl)s
+action = firewallcmd-rich-rules[name=HTTP, port="http,https", protocol=tcp]
+
 EOF
 else
   cat <<EOF >> /etc/fail2ban/jail.local
 [DEFAULT]
-ignoreip = 127.0.0.1
-bantime = 86400
-maxretry = $maxretry
-findtime = 1800
+#ignoreip = 127.0.0.1/8 ::1
+#bantime = 86400
+#maxretry = $maxretry
+#findtime = 1800
+#banaction = firewallcmd-rich-rules
+#action = firewallcmd-rich-rules
 
-[ssh-iptables]
-enabled = true
-filter = sshd
-action = iptables[name=SSH, port=ssh, protocol=tcp]
-logpath = /var/log/auth.log
-maxretry = $maxretry
-findtime = 3600
-bantime = $bantime
+[sshd]
+#enabled = true
+#filter = sshd
+#port = ssh
+#logpath = /var/log/secure
+#maxretry = $maxretry
 
-[custom-sshd]
+#[custom-sshd]
+#enabled = true
+#filter = custom-sshd
+#port = $ssh_port
+#logpath = /var/log/secure
+#maxretry = $maxretry
+#findtime = 600
+#bantime = $bantime
+#action = firewallcmd-rich-rules
+
+[http-get-dos]
 enabled = true
-filter = custom-sshd
-port = $ssh_port
-logpath = /var/log/auth.log
-maxretry = $maxretry
-findtime = 3600
+port    = http,https
+filter  = http-get-dos
+logpath = /opt/ats/var/log/node/cdnnode.log #自己的网站日志
+maxretry = 800
+findtime = 60
 bantime = $bantime
-action = %(action_mwl)s
+action = firewallcmd-rich-rules[name=HTTP, port="http,https", protocol=tcp]
 EOF
 fi
 
