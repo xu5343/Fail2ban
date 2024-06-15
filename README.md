@@ -23,9 +23,18 @@
 # 卸载 #
     wget https://raw.githubusercontent.com/xu5343/Fail2ban/master/uninstall.sh && bash uninstall.sh
 
+# 自定义自动检测日志 #  
+~~~
+crontab -e
+0 * * * * /root/jc3.sh >> /root/jc3.log 2>&1
+chmod +x jc3.sh
+crontab -l
+~~~
+
 # 注意事项 #
 1. 安装完成后请会重启SSH服务，请重新连接SSH会话
 2. 若出现SSH无法连接的情况，请检查是否修改过SSH端口，请填写写改后的正确端口进行连接
+
 
 # 更新日志 #
 2024.05.30 增加自定义规则，提升预防能力。  
