@@ -82,8 +82,16 @@ if ! command -v firewall-cmd &> /dev/null; then
   elif [[ $OS == "ubuntu" || $OS == "debian" ]]; then
     apt-get -y install firewalld
   fi
-  systemctl start firewalld
-  systemctl enable firewalld
+fi
+
+# 启动并设置firewalld为开机自启动
+systemctl start firewalld
+systemctl enable firewalld
+
+# 检查 firewalld 是否成功启动
+if ! systemctl is-active --quiet firewalld; then
+  echo "firewalld 启动失败，请检查配置！"
+  exit 1
 fi
 
 # 检查安装的 Fail2ban 版本
