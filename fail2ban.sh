@@ -1,11 +1,20 @@
 #!/bin/bash
 
+# 清除屏幕
 clear
+
 # 检查是否为Root用户
-[ $(id -u) != "0" ] && { echo "错误: 您必须以root身份运行此脚本"; exit 1; }
+if [ $(id -u) != "0" ]; then
+  echo "错误: 您必须以root身份运行此脚本"
+  exit 1
+fi
 
 # 读取SSH端口
-[ -z "$(grep ^Port /etc/ssh/sshd_config)" ] && SSH_PORT=22 || SSH_PORT=$(grep ^Port /etc/ssh/sshd_config | awk '{print $2}')
+if [ -z "$(grep ^Port /etc/ssh/sshd_config)" ]; then
+  SSH_PORT=22
+else
+  SSH_PORT=$(grep ^Port /etc/ssh/sshd_config | awk '{print $2}')
+fi
 
 # 检查操作系统
 if [ -f /etc/os-release ]; then
@@ -23,9 +32,10 @@ echo "--------------------"
 echo "这个Shell脚本可以通过 Fail2ban 和 firewalld 保护您的服务器免受SSH攻击"
 echo ""
 
+# 修改SSH端口
 while :; do
   read -p "是否要更改SSH端口？ [y/n]: " ChangeSSHPort
-  if [[ $ChangeSSHPort == 'y' || $ChangeSSHPort == 'Y' ]]; then
+  if [[ $ChangeSSHPort =~ ^[yY]$ ]]; then
     while :; do
       read -p "请输入SSH端口(默认: $SSH_PORT): " InputSSHPort
       [ -z "$InputSSHPort" ] && InputSSHPort=$SSH_PORT
@@ -38,19 +48,18 @@ while :; do
     done
     sed -i "s/^Port .*/Port $SSH_PORT/" /etc/ssh/sshd_config
     break
-  elif [[ $ChangeSSHPort == 'n' || $ChangeSSHPort == 'N' ]]; then
+  elif [[ $ChangeSSHPort =~ ^[nN]$ ]]; then
     break
   else
     echo "输入错误！请仅输入 y 或 n！"
   fi
 done
 
-echo ""
+# 读取最大尝试次数和封锁持续时间
 read -p "输入最大尝试次数 [2-10]: " MaxRetry
-echo ""
 read -p "输入封锁IP的持续时间 [小时]: " BanTime
-[ -z "$MaxRetry" ] && MaxRetry=3
-[ -z "$BanTime" ] && BanTime=24
+MaxRetry=${MaxRetry:-3}
+BanTime=${BanTime:-24}
 BanTime=$((BanTime * 60 * 60))
 
 # 安装Fail2ban和firewalld
@@ -81,7 +90,7 @@ fi
 fail2ban_version=$(fail2ban-server --version | grep -oP '\d+\.\d+\.\d+')
 echo "安装的 Fail2ban 版本为: $fail2ban_version"
 
-# 加入 firewall 默认端口
+# 添加 firewall 默认端口
 firewall-cmd --permanent --add-service=http
 firewall-cmd --permanent --add-service=https
 firewall-cmd --permanent --add-service=ssh
@@ -89,7 +98,6 @@ firewall-cmd --permanent --add-port=80/tcp
 firewall-cmd --permanent --add-port=443/tcp
 firewall-cmd --permanent --add-port=$SSH_PORT/tcp
 firewall-cmd --reload
-firewall-cmd --list-all
 
 # 配置Fail2ban
 cat <<EOF > /etc/fail2ban/jail.local
@@ -118,15 +126,15 @@ findtime = 600
 bantime = $BanTime
 action = firewallcmd-rich-rules
 
-[http-get-dos]
+[nginx-cc]
 enabled = true
 port = http,https
-filter = http-get-dos
-logpath = /opt/ats/var/log/node/cdnnode.log
-maxretry = 800
+filter = nginx-cc
+action = %(action_mwl)s
+maxretry = 20
 findtime = 60
-bantime = $BanTime
-action = firewallcmd-rich-rules[name=HTTP, port="http,https", protocol=tcp]
+bantime = 3600
+logpath = /opt/ats/var/log/node/cdnnode.log
 EOF
 
 # 创建自定义过滤规则文件
@@ -143,9 +151,18 @@ failregex = ^.*sshd\[.*\]: Bad protocol version identification.*from <HOST> port
             ^.*sshd\[.*\]: reverse mapping checking getaddrinfo for .* \[<HOST>\] failed - POSSIBLE BREAK-IN ATTEMPT!$
 EOF
 
+# 创建CC自定义过滤规则文件
+cat <<EOF > /etc/fail2ban/filter.d/nginx-cc.conf
+[Definition]
+failregex = ^<HOST> -.*- .*HTTP/1.* .* .*$
+ignoreregex =
+EOF
+
 # 启动并设置Fail2ban为开机自启动
 systemctl restart fail2ban
 systemctl enable fail2ban
+systemctl start firewalld
+systemctl enable firewalld
 
 # 检查 Fail2ban 是否正常工作
 if systemctl is-active --quiet fail2ban; then
@@ -167,7 +184,7 @@ echo "Fail2ban sshd状态"
 fail2ban-client status sshd
 
 echo "Fail2ban http-get-dos状态"
-fail2ban-client status http-get-dos
+fail2ban-client status nginx-cc
 
 echo "Fail2ban custom-sshd状态"
 fail2ban-client status custom-sshd
