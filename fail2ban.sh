@@ -142,7 +142,7 @@ action = %(action_mwl)s
 maxretry = 20
 findtime = 60
 bantime = 3600
-logpath = /opt/ats/var/log/node/cdnnode.log
+logpath = /var/log/secure
 EOF
 
 # 创建自定义过滤规则文件
