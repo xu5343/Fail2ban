@@ -104,6 +104,8 @@ firewall-cmd --permanent --add-service=https
 firewall-cmd --permanent --add-service=ssh
 firewall-cmd --permanent --add-port=80/tcp
 firewall-cmd --permanent --add-port=443/tcp
+firewall-cmd --permanent --add-port=8000/tcp
+firewall-cmd --permanent --add-port=9000/tcp
 firewall-cmd --permanent --add-port=$SSH_PORT/tcp
 firewall-cmd --reload
 
