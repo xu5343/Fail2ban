@@ -143,7 +143,7 @@ filter = nginx-cc
 action = %(action_mwl)s
 maxretry = 20
 findtime = 60
-bantime = 3600
+bantime = 28800
 logpath = /var/log/secure
 EOF
 
